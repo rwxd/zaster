@@ -6,15 +6,13 @@ import (
 )
 
 var DocStyle = lipgloss.NewStyle().Margin(1, 2)
-
-var HelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Render
-
-var ErrStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#bd534b")).Render
+var HelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+var ErrStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#bd534b"))
 
 type keymap struct {
 	Create key.Binding
 	Select key.Binding
-	Rename key.Binding
+	Edit   key.Binding
 	Delete key.Binding
 	Back   key.Binding
 	Up     key.Binding
@@ -32,9 +30,9 @@ var Keymap = keymap{
 		key.WithKeys("enter", " "),
 		key.WithHelp("enter", "select"),
 	),
-	Rename: key.NewBinding(
-		key.WithKeys("r"),
-		key.WithHelp("r", "rename"),
+	Edit: key.NewBinding(
+		key.WithKeys("e"),
+		key.WithHelp("e", "edit"),
 	),
 	Delete: key.NewBinding(
 		key.WithKeys("d"),
@@ -45,10 +43,12 @@ var Keymap = keymap{
 		key.WithHelp("esc", "back"),
 	),
 	Up: key.NewBinding(
-		key.WithKeys("up", "k", "w"),
+		key.WithKeys("k", "up", "w"),
+		key.WithHelp("k", "up"),
 	),
 	Down: key.NewBinding(
-		key.WithKeys("down", "j", "s"),
+		key.WithKeys("j", "down", "s"),
+		key.WithHelp("j", "down"),
 	),
 	Quit: key.NewBinding(
 		key.WithKeys("q", "ctrl+c"),

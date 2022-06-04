@@ -17,7 +17,7 @@ type Transaction struct {
 	ID          uuid.UUID      `json: "id"`
 	Value       float64        `json: "value"`
 	Time        time.Time      `json: "date"`
-	Receiver    string         `json: "receiver"`
+	Payee       string         `json: "payee"`
 	Account     string         `json: "account"`
 	Category    string         `json: "category"`
 	Budget      string         `json: "budget"`
@@ -32,13 +32,13 @@ func (t Transaction) Str() string {
 	} else {
 		prefix = "To"
 	}
-	return fmt.Sprintf("%s %s, from account %s, amount %f, on %s", prefix, t.Receiver, t.Account, t.Value, t.Time.Format("02-01-2006"))
+	return fmt.Sprintf("%s %s, from account %s, amount %f, on %s", prefix, t.Payee, t.Account, t.Value, t.Time.Format("02-01-2006"))
 }
 
 func NewTransaction(
 	value float64,
 	time time.Time,
-	user string,
+	payee string,
 	account string,
 	category string,
 	budget string,
@@ -49,7 +49,7 @@ func NewTransaction(
 		ID:          uuid.New(),
 		Value:       value,
 		Time:        time,
-		Receiver:    user,
+		Payee:       payee,
 		Account:     account,
 		Category:    category,
 		Description: description,
@@ -68,7 +68,7 @@ func GetFilteredTransactions(transactions []Transaction, date time.Time, receive
 		if date == transaction.Time {
 			filtered = append(filtered, transaction)
 			break
-		} else if receiver != "" && receiver == transaction.Receiver {
+		} else if receiver != "" && receiver == transaction.Payee {
 			filtered = append(filtered, transaction)
 			break
 		} else if category != "" && category == transaction.Category {

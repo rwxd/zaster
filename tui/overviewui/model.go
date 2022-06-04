@@ -1,14 +1,28 @@
 package overviewui
 
 import (
+	"log"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/evertras/bubble-table/table"
 	"github.com/rwxd/zaster/internal"
 	"github.com/rwxd/zaster/tui/constants"
 	"github.com/rwxd/zaster/tui/models"
+)
+
+const (
+	columnKeyID          = "id"
+	columnKeyValue       = "value"
+	columnKeyTime        = "time"
+	columnKeyPayee       = "payee"
+	columnKeyAccount     = "account"
+	columnKeyCategory    = "category"
+	columnKeyBudget      = "budget"
+	columnKeyDescription = "description"
 )
 
 type SelectMsg struct {
@@ -16,9 +30,11 @@ type SelectMsg struct {
 }
 
 type Model struct {
-	list     list.Model
-	selected int
-	cursor   int
+	table       table.Model
+	TableWidth  int
+	TableMargin int
+	selected    int
+	cursor      int
 }
 
 // Load transactions database on start
@@ -33,17 +49,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		top, right, bottom, left := constants.DocStyle.GetMargin()
-		m.list.SetSize(msg.Width-left-right, msg.Height-top-bottom-1)
+		m.TableWidth = msg.Width
+		m.recalculateTable()
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, constants.Keymap.Quit):
 			return m, tea.Quit
 		case key.Matches(msg, constants.Keymap.Select):
-			cmd = selectTransactionCmd(m.getActiveTransaction())
-			m.selected = m.cursor
+			highlightedRow := m.table.HighlightedRow()
+			selected := highlightedRow.Data[columnKeyID]
+			log.Println("Selected transaction: ", selected)
 		default:
-			m.list, cmd = m.list.Update(msg)
+			m.table, cmd = m.table.Update(msg)
 		}
 	}
 	cmds = append(cmds, cmd)
@@ -51,21 +68,40 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) View() string {
-	return constants.DocStyle.Render(m.list.View() + "\n")
+	body := strings.Builder{}
+	body.WriteString(m.table.View() + "\n")
+	return body.String()
 }
 
-func (m Model) getActiveTransaction() models.TransactionModel {
-	items := m.list.Items()
-	activeItem := items[m.list.Index()]
-	return activeItem.(models.TransactionModel)
+func (m *Model) recalculateTable() {
+	m.table = m.table.WithTargetWidth(m.TableWidth - m.TableMargin)
 }
 
-func transactionModelsToListItems(transactions []models.TransactionModel) []list.Item {
-	items := make([]list.Item, len(transactions))
-	for i, transaction := range transactions {
-		items[i] = list.Item(transaction)
+func getFooter() string {
+	var footer string
+	keymaps := [][]string{
+		{constants.Keymap.Up.Help().Key, constants.Keymap.Up.Help().Desc},
+		{constants.Keymap.Down.Help().Key, constants.Keymap.Down.Help().Desc},
+		{constants.Keymap.Create.Help().Key, constants.Keymap.Create.Help().Desc},
+		{constants.Keymap.Edit.Help().Key, constants.Keymap.Edit.Help().Desc},
+		{constants.Keymap.Delete.Help().Key, constants.Keymap.Delete.Help().Desc},
+		{constants.Keymap.Quit.Help().Key, constants.Keymap.Quit.Help().Desc},
 	}
-	return items
+	for index, keys := range keymaps {
+		footer += keys[0] + " " + keys[1]
+		if index+1 != len(keymaps) {
+			footer += " · "
+		}
+	}
+	// footer := fmt.Sprintf("%s up - %s down - %s create - %s edit - %s delete - %s quit",
+	// 	constants.Keymap.Up.Help().Key,
+	// 	constants.Keymap.Down.Help().Key,
+	// 	constants.Keymap.Create.Help().Key,
+	// 	constants.Keymap.Edit.Help().Key,
+	// 	constants.Keymap.Delete.Help().Key,
+	// 	constants.Keymap.Quit.Help().Key,
+	// )
+	return constants.HelpStyle.Render(footer)
 }
 
 func loadTransactions() []models.TransactionModel {
@@ -83,21 +119,61 @@ func loadTransactions() []models.TransactionModel {
 	return transactionModels
 }
 
+func transformTransactionModelsToTableRows(transactionModels []models.TransactionModel) []table.Row {
+	rows := make([]table.Row, len(transactionModels))
+	for i, t := range transactionModels {
+		rows[i] = table.NewRow(table.RowData{
+			columnKeyValue:       t.Transaction.Value,
+			columnKeyTime:        t.Transaction.Time.Format("02-01-2006"),
+			columnKeyPayee:       t.Transaction.Payee,
+			columnKeyAccount:     t.Transaction.Account,
+			columnKeyCategory:    t.Transaction.Category,
+			columnKeyBudget:      t.Transaction.Budget,
+			columnKeyDescription: t.Transaction.Description,
+			columnKeyID:          t.Transaction.ID.String(),
+		})
+	}
+	return rows
+}
+
+func createTableColumns() []table.Column {
+	return []table.Column{
+		table.NewFlexColumn(columnKeyValue, "Value", 5),
+		table.NewColumn(columnKeyTime, "Time", 10),
+		table.NewFlexColumn(columnKeyPayee, "Payee", 15),
+		table.NewFlexColumn(columnKeyAccount, "Account", 15),
+		table.NewFlexColumn(columnKeyCategory, "Category", 15),
+		table.NewFlexColumn(columnKeyBudget, "Budget", 15),
+		table.NewFlexColumn(columnKeyDescription, "Description", 15),
+	}
+}
+
 func NewOverviewModel() Model {
-	items := transactionModelsToListItems(loadTransactions())
+	tableRows := transformTransactionModelsToTableRows(loadTransactions())
+	tableColumns := createTableColumns()
+
+	keys := table.DefaultKeyMap()
+	keys.RowUp.SetKeys(constants.Keymap.Up.Keys()...)
+	keys.RowDown.SetKeys(constants.Keymap.Down.Keys()...)
+
+	transactionTable := table.New(tableColumns).
+		WithRows(tableRows).
+		WithTargetWidth(60).
+		WithKeyMap(keys).
+		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#e07a5f")).Bold(true)).
+		HighlightStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#81b29a")).Bold(true)).
+		Focused(true).
+		WithBaseStyle(
+			lipgloss.NewStyle().
+				BorderForeground(lipgloss.Color("#f4f1de")).
+				Foreground(lipgloss.Color("#e6e6fa")).
+				Align(lipgloss.Left),
+		).
+		SortByAsc(columnKeyTime).
+		WithStaticFooter(getFooter())
 
 	m := Model{
-		list: list.NewModel(items, list.NewDefaultDelegate(), 0, 0),
-	}
-
-	m.list.Title = "Transactions"
-	m.list.AdditionalShortHelpKeys = func() []key.Binding {
-		return []key.Binding{
-			constants.Keymap.Select,
-			constants.Keymap.Quit,
-			constants.Keymap.Create,
-			constants.Keymap.Delete,
-		}
+		table: transactionTable,
 	}
 	return m
 }

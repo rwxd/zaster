@@ -5,21 +5,21 @@ import (
 )
 
 type TransactionModel struct {
-	transaction internal.Transaction
+	Transaction internal.Transaction
 }
 
 func (t TransactionModel) Title() string {
-	return t.transaction.Str()
+	return t.Transaction.Str()
 }
 
 func (t TransactionModel) Description() string {
-	return t.transaction.Description
+	return t.Transaction.Description
 }
 
 func (t TransactionModel) FilterValue() string {
-	return t.transaction.Str()
+	return t.Transaction.Str()
 }
 
 func NewTransactionModel(transaction internal.Transaction) TransactionModel {
-	return TransactionModel{transaction: transaction}
+	return TransactionModel{Transaction: transaction}
 }
