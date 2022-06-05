@@ -1,9 +1,9 @@
 package overviewui
 
 import (
+	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -20,21 +20,19 @@ const (
 	columnKeyTime        = "time"
 	columnKeyPayee       = "payee"
 	columnKeyAccount     = "account"
-	columnKeyCategory    = "category"
 	columnKeyBudget      = "budget"
 	columnKeyDescription = "description"
 )
 
 type SelectMsg struct {
-	transaction models.TransactionModel
+	ActiveTransaction string
 }
 
 type Model struct {
 	table       table.Model
 	TableWidth  int
 	TableMargin int
-	selected    int
-	cursor      int
+	db          *internal.JSONDatabase
 }
 
 // Load transactions database on start
@@ -58,7 +56,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, constants.Keymap.Select):
 			highlightedRow := m.table.HighlightedRow()
 			selected := highlightedRow.Data[columnKeyID]
-			log.Println("Selected transaction: ", selected)
+			cmd = selectTransactionCmd(fmt.Sprintf("%v", selected))
 		default:
 			m.table, cmd = m.table.Update(msg)
 		}
@@ -93,25 +91,12 @@ func getFooter() string {
 			footer += " · "
 		}
 	}
-	// footer := fmt.Sprintf("%s up - %s down - %s create - %s edit - %s delete - %s quit",
-	// 	constants.Keymap.Up.Help().Key,
-	// 	constants.Keymap.Down.Help().Key,
-	// 	constants.Keymap.Create.Help().Key,
-	// 	constants.Keymap.Edit.Help().Key,
-	// 	constants.Keymap.Delete.Help().Key,
-	// 	constants.Keymap.Quit.Help().Key,
-	// )
 	return constants.HelpStyle.Render(footer)
 }
 
-func loadTransactions() []models.TransactionModel {
-	transaction1, _ := internal.NewTransaction(25.0, time.Now(), "Marten", "Commerzbank", "", "", "Essen", internal.MoneyInflow)
-	transaction2, _ := internal.NewTransaction(36.99, time.Now(), "Peter", "Commerzbank", "", "", "", internal.MoneyOutflow)
-	transaction3, _ := internal.NewTransaction(29.72, time.Now(), "Versicherung", "Commerzbank", "", "", "Rückzahlung", internal.MoneyInflow)
-	transaction4, _ := internal.NewTransaction(129.53, time.Now(), "DB", "Commerzbank", "", "", "9€ Ticket", internal.MoneyOutflow)
-	transaction5, _ := internal.NewTransaction(12.0, time.Now(), "Mc Donalds", "Commerzbank", "", "", "Essen gehen", internal.MoneyOutflow)
-	transaction6, _ := internal.NewTransaction(2502.0, time.Now(), "Firma", "", "", "", "Gehalt", internal.MoneyInflow)
-	tempTransactions := []internal.Transaction{transaction1, transaction2, transaction3, transaction4, transaction5, transaction6}
+func (m *Model) loadTransactions() []models.TransactionModel {
+	tempTransactions := m.db.Data.Transactions
+	log.Printf("Found %d transactions\n", len(tempTransactions))
 	transactionModels := make([]models.TransactionModel, len(tempTransactions))
 	for i, transaction := range tempTransactions {
 		transactionModels[i] = models.NewTransactionModel(transaction)
@@ -122,12 +107,18 @@ func loadTransactions() []models.TransactionModel {
 func transformTransactionModelsToTableRows(transactionModels []models.TransactionModel) []table.Row {
 	rows := make([]table.Row, len(transactionModels))
 	for i, t := range transactionModels {
+		var style lipgloss.Style
+		if t.Transaction.Direction == internal.MoneyOutflow {
+			style = lipgloss.NewStyle().Foreground(lipgloss.Color("#d11141"))
+		} else {
+			style = lipgloss.NewStyle().Foreground(lipgloss.Color("#00b159"))
+		}
+
 		rows[i] = table.NewRow(table.RowData{
-			columnKeyValue:       t.Transaction.Value,
+			columnKeyValue:       style.Render(fmt.Sprintf("%.2f", t.Transaction.Value)),
 			columnKeyTime:        t.Transaction.Time.Format("02-01-2006"),
 			columnKeyPayee:       t.Transaction.Payee,
 			columnKeyAccount:     t.Transaction.Account,
-			columnKeyCategory:    t.Transaction.Category,
 			columnKeyBudget:      t.Transaction.Budget,
 			columnKeyDescription: t.Transaction.Description,
 			columnKeyID:          t.Transaction.ID.String(),
@@ -138,18 +129,18 @@ func transformTransactionModelsToTableRows(transactionModels []models.Transactio
 
 func createTableColumns() []table.Column {
 	return []table.Column{
-		table.NewFlexColumn(columnKeyValue, "Value", 5),
+		table.NewFlexColumn(columnKeyValue, "Value", 8),
 		table.NewColumn(columnKeyTime, "Time", 10),
 		table.NewFlexColumn(columnKeyPayee, "Payee", 15),
 		table.NewFlexColumn(columnKeyAccount, "Account", 15),
-		table.NewFlexColumn(columnKeyCategory, "Category", 15),
 		table.NewFlexColumn(columnKeyBudget, "Budget", 15),
 		table.NewFlexColumn(columnKeyDescription, "Description", 15),
 	}
 }
 
-func NewOverviewModel() Model {
-	tableRows := transformTransactionModelsToTableRows(loadTransactions())
+func NewOverviewModel(db *internal.JSONDatabase) Model {
+	m := Model{db: db}
+	tableRows := transformTransactionModelsToTableRows(m.loadTransactions())
 	tableColumns := createTableColumns()
 
 	keys := table.DefaultKeyMap()
@@ -160,7 +151,7 @@ func NewOverviewModel() Model {
 		WithRows(tableRows).
 		WithTargetWidth(60).
 		WithKeyMap(keys).
-		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#e07a5f")).Bold(true)).
+		HeaderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#2a9d8f")).Bold(true)).
 		HighlightStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("#81b29a")).Bold(true)).
 		Focused(true).
 		WithBaseStyle(
@@ -171,9 +162,7 @@ func NewOverviewModel() Model {
 		).
 		SortByAsc(columnKeyTime).
 		WithStaticFooter(getFooter())
+	m.table = transactionTable
 
-	m := Model{
-		table: transactionTable,
-	}
 	return m
 }

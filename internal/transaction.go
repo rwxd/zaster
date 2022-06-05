@@ -2,7 +2,6 @@ package internal
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,15 +13,14 @@ const MoneyInflow MoneyDirection = "in"
 const MoneyOutflow MoneyDirection = "out"
 
 type Transaction struct {
-	ID          uuid.UUID      `json: "id"`
-	Value       float64        `json: "value"`
-	Time        time.Time      `json: "date"`
-	Payee       string         `json: "payee"`
-	Account     string         `json: "account"`
-	Category    string         `json: "category"`
-	Budget      string         `json: "budget"`
-	Description string         `json: "description"`
-	Direction   MoneyDirection `json: "direction"`
+	ID          uuid.UUID      `json:"id"`
+	Value       float64        `json:"value"`
+	Time        time.Time      `json:"date"`
+	Payee       string         `json:"payee"`
+	Account     Account        `json:"account"`
+	Budget      Budget         `json:"budget"`
+	Description string         `json:"description"`
+	Direction   MoneyDirection `json:"direction"`
 }
 
 func (t Transaction) Str() string {
@@ -39,9 +37,8 @@ func NewTransaction(
 	value float64,
 	time time.Time,
 	payee string,
-	account string,
-	category string,
-	budget string,
+	account Account,
+	budget Budget,
 	description string,
 	direction MoneyDirection,
 ) (Transaction, error) {
@@ -51,7 +48,6 @@ func NewTransaction(
 		Time:        time,
 		Payee:       payee,
 		Account:     account,
-		Category:    category,
 		Description: description,
 		Budget:      budget,
 		Direction:   direction,
@@ -59,31 +55,31 @@ func NewTransaction(
 	return transaction, nil
 }
 
-func GetFilteredTransactions(transactions []Transaction, date time.Time, receiver string,
-	account string, category string, budget string, description string) ([]Transaction, error) {
-
-	var filtered []Transaction
-
-	for _, transaction := range transactions {
-		if date == transaction.Time {
-			filtered = append(filtered, transaction)
-			break
-		} else if receiver != "" && receiver == transaction.Payee {
-			filtered = append(filtered, transaction)
-			break
-		} else if category != "" && category == transaction.Category {
-			filtered = append(filtered, transaction)
-			break
-		} else if account != "" && account == transaction.Account {
-			filtered = append(filtered, transaction)
-			break
-		} else if description != "" && strings.Contains(description, transaction.Description) {
-			filtered = append(filtered, transaction)
-			break
-		} else if budget != "" && budget == transaction.Budget {
-			filtered = append(filtered, transaction)
-			break
-		}
-	}
-	return filtered, nil
-}
+// func GetFilteredTransactions(transactions []Transaction, date time.Time, receiver string,
+// 	account string, category string, budget string, description string) ([]Transaction, error) {
+//
+// 	var filtered []Transaction
+//
+// 	for _, transaction := range transactions {
+// 		if date == transaction.Time {
+// 			filtered = append(filtered, transaction)
+// 			break
+// 		} else if receiver != "" && receiver == transaction.Payee {
+// 			filtered = append(filtered, transaction)
+// 			break
+// 		} else if category != "" && category == transaction.Category {
+// 			filtered = append(filtered, transaction)
+// 			break
+// 		} else if account != "" && account == transaction.Account {
+// 			filtered = append(filtered, transaction)
+// 			break
+// 		} else if description != "" && strings.Contains(description, transaction.Description) {
+// 			filtered = append(filtered, transaction)
+// 			break
+// 		} else if budget != "" && budget == transaction.Budget {
+// 			filtered = append(filtered, transaction)
+// 			break
+// 		}
+// 	}
+// 	return filtered, nil
+// }
