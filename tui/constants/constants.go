@@ -3,7 +3,28 @@ package constants
 import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/evertras/bubble-table/table"
 )
+
+var CustomBorder = table.Border{
+	Top:    "─",
+	Left:   "│",
+	Right:  "│",
+	Bottom: "─",
+
+	TopRight:    "╮",
+	TopLeft:     "╭",
+	BottomRight: "╯",
+	BottomLeft:  "╰",
+
+	TopJunction:    "╥",
+	LeftJunction:   "├",
+	RightJunction:  "┤",
+	BottomJunction: "╨",
+	InnerJunction:  "╫",
+
+	InnerDivider: "║",
+}
 
 var DocStyle = lipgloss.NewStyle().Margin(1, 2)
 var HelpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))

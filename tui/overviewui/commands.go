@@ -4,11 +4,12 @@ import (
 	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/rwxd/zaster/internal"
 )
 
-func selectTransactionCmd(transactionId string) tea.Cmd {
+func selectTransactionCmd(transaction internal.Transaction) tea.Cmd {
 	return func() tea.Msg {
-		log.Println("Selected transaction: ", transactionId)
-		return SelectMsg{ActiveTransaction: transactionId}
+		log.Println("Selected transaction: ", transaction.Str())
+		return SelectMsg{ActiveTransaction: transaction}
 	}
 }

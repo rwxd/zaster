@@ -13,12 +13,12 @@ const MoneyInflow MoneyDirection = "in"
 const MoneyOutflow MoneyDirection = "out"
 
 type Transaction struct {
-	ID          uuid.UUID      `json:"id"`
+	Id          uuid.UUID      `json:"id"`
 	Value       float64        `json:"value"`
 	Time        time.Time      `json:"date"`
 	Payee       string         `json:"payee"`
 	Account     Account        `json:"account"`
-	Budget      Budget         `json:"budget"`
+	Category    Category       `json:"category"`
 	Description string         `json:"description"`
 	Direction   MoneyDirection `json:"direction"`
 }
@@ -38,21 +38,21 @@ func NewTransaction(
 	time time.Time,
 	payee string,
 	account Account,
-	budget Budget,
+	category Category,
 	description string,
 	direction MoneyDirection,
-) (Transaction, error) {
+) Transaction {
 	transaction := Transaction{
-		ID:          uuid.New(),
+		Id:          uuid.New(),
 		Value:       value,
 		Time:        time,
 		Payee:       payee,
 		Account:     account,
 		Description: description,
-		Budget:      budget,
+		Category:    category,
 		Direction:   direction,
 	}
-	return transaction, nil
+	return transaction
 }
 
 // func GetFilteredTransactions(transactions []Transaction, date time.Time, receiver string,

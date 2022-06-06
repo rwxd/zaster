@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rwxd/zaster/internal"
+	"github.com/rwxd/zaster/tui/entryviewui"
 	"github.com/rwxd/zaster/tui/overviewui"
 )
 
@@ -16,11 +17,11 @@ const overviewViewState sessionState = 1
 const transactionViewState sessionState = 2
 
 type MainModel struct {
-	overview          tea.Model
-	entry             tea.Model
+	overviewModel     tea.Model
+	transactionModel  tea.Model
 	state             sessionState
-	db                internal.JSONDatabase
-	activeTransaction string
+	db                *internal.JSONDatabase
+	activeTransaction internal.Transaction
 }
 
 // Init run any intial IO on program start
@@ -36,16 +37,21 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case overviewui.SelectMsg:
 		m.state = transactionViewState
 		m.activeTransaction = msg.ActiveTransaction
+	case entryviewui.BackMsg:
+		m.state = overviewViewState
 	}
 
 	switch m.state {
 	case overviewViewState:
-		newOverview, newCmd := m.overview.Update(msg)
+		newOverview, newCmd := m.overviewModel.Update(msg)
 		overviewModel := newOverview.(overviewui.Model)
-		m.overview = overviewModel
+		m.overviewModel = overviewModel
 		cmd = newCmd
 	case transactionViewState:
-		// newTransaction :=
+		newTransactionModel, newCmd := m.transactionModel.Update(msg)
+		transactionModel := newTransactionModel.(entryviewui.Model)
+		m.transactionModel = transactionModel
+		cmd = newCmd
 	}
 
 	cmds = append(cmds, cmd)
@@ -53,19 +59,20 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m MainModel) View() string {
-	// switch m.state {
-	// case entryViewState:
-	// 	return m.entry.View()
-	// default:
-	// 	return m.overview.View()
-	// }
-	return m.overview.View()
+	switch m.state {
+	case transactionViewState:
+		m.transactionModel = entryviewui.NewEntryViewModel(m.activeTransaction, m.db)
+		return m.transactionModel.View()
+	default:
+		return m.overviewModel.View()
+	}
 }
 
 func NewMainModel(db *internal.JSONDatabase) MainModel {
 	return MainModel{
-		state:    overviewViewState,
-		overview: overviewui.NewOverviewModel(db),
+		state:            overviewViewState,
+		overviewModel:    overviewui.NewOverviewModel(db),
+		transactionModel: entryviewui.NewEntryViewModel(internal.Transaction{}, db),
 	}
 }
 

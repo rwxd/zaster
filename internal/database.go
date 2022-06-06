@@ -2,6 +2,7 @@ package internal
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
@@ -9,12 +10,12 @@ import (
 )
 
 type Account string
-type Budget string
+type Category string
 
 type DatabaseData struct {
-	Transactions []Transaction `json:"transactions"`
-	Accounts     []Account     `json:"accounts"`
-	Budgets      []Budget      `json:"budgets"`
+	Transactions map[string]Transaction `json:"transactions"`
+	Accounts     []Account              `json:"accounts"`
+	Categories   []Category             `json:"budgets"`
 }
 
 type JSONDatabase struct {
@@ -81,16 +82,30 @@ func (db *JSONDatabase) commitDatabase() {
 func (db *JSONDatabase) writeInitialData() {
 	data := DatabaseData{}
 	data.Accounts = []Account{"Commerzbank", "Deutsche Bank"}
-	data.Budgets = []Budget{"Food", "Games", "Investment"}
+	data.Categories = []Category{"Food", "Games", "Investment", "Misc", "Inflow"}
+	tempTransactions := []Transaction{
+		NewTransaction(25.0, time.Now(), "Marten", "Commerzbank", "Food", "wegen Essen", MoneyInflow),
+		NewTransaction(36.99, time.Now(), "Peter", "Commerzbank", "Food", "Essen gegangen", MoneyOutflow),
+		NewTransaction(29.72, time.Now(), "Versicherung", "Commerzbank", "Misc", "Rückzahlung", MoneyInflow),
+		NewTransaction(129.53, time.Now(), "DB", "Commerzbank", "Misc", "9€ Ticket", MoneyOutflow),
+		NewTransaction(12.0, time.Now(), "Mc Donalds", "Commerzbank", "Food", "Essen gehen", MoneyOutflow),
+		NewTransaction(2502.0, time.Now(), "Firma", "Deutsche Bank", "Inflow", "Gehalt", MoneyInflow),
+	}
 
-	transaction1, _ := NewTransaction(25.0, time.Now(), "Marten", "Commerzbank", "", "Essen", MoneyInflow)
-	transaction2, _ := NewTransaction(36.99, time.Now(), "Peter", "Commerzbank", "", "", MoneyOutflow)
-	transaction3, _ := NewTransaction(29.72, time.Now(), "Versicherung", "Commerzbank", "", "Rückzahlung", MoneyInflow)
-	transaction4, _ := NewTransaction(129.53, time.Now(), "DB", "Commerzbank", "", "9€ Ticket", MoneyOutflow)
-	transaction5, _ := NewTransaction(12.0, time.Now(), "Mc Donalds", "Commerzbank", "", "Essen gehen", MoneyOutflow)
-	transaction6, _ := NewTransaction(2502.0, time.Now(), "Firma", "", "", "Gehalt", MoneyInflow)
-	data.Transactions = []Transaction{transaction1, transaction2, transaction3, transaction4, transaction5, transaction6}
+	data.Transactions = make(map[string]Transaction)
+	for _, t := range tempTransactions {
+		data.Transactions[t.Id.String()] = t
+	}
 	db.Data = &data
+}
+
+func (db *JSONDatabase) GetTransactionById(id string) (Transaction, error) {
+	transaction, found := db.Data.Transactions[id]
+	if !found {
+		return Transaction{}, errors.New("Transaction does not exist")
+	}
+
+	return transaction, nil
 }
 
 func NewJSONDatabase(filePath string) JSONDatabase {

@@ -11,7 +11,6 @@ import (
 	"github.com/evertras/bubble-table/table"
 	"github.com/rwxd/zaster/internal"
 	"github.com/rwxd/zaster/tui/constants"
-	"github.com/rwxd/zaster/tui/models"
 )
 
 const (
@@ -20,12 +19,12 @@ const (
 	columnKeyTime        = "time"
 	columnKeyPayee       = "payee"
 	columnKeyAccount     = "account"
-	columnKeyBudget      = "budget"
+	columnKeyCategory    = "category"
 	columnKeyDescription = "description"
 )
 
 type SelectMsg struct {
-	ActiveTransaction string
+	ActiveTransaction internal.Transaction
 }
 
 type Model struct {
@@ -55,8 +54,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case key.Matches(msg, constants.Keymap.Select):
 			highlightedRow := m.table.HighlightedRow()
-			selected := highlightedRow.Data[columnKeyID]
-			cmd = selectTransactionCmd(fmt.Sprintf("%v", selected))
+			selectedId := highlightedRow.Data[columnKeyID]
+			transaction, err := m.db.GetTransactionById(fmt.Sprintf("%v", selectedId))
+			if err != nil {
+				log.Fatal(err)
+			}
+			cmd = selectTransactionCmd(transaction)
 		default:
 			m.table, cmd = m.table.Update(msg)
 		}
@@ -94,35 +97,37 @@ func getFooter() string {
 	return constants.HelpStyle.Render(footer)
 }
 
-func (m *Model) loadTransactions() []models.TransactionModel {
+func (m *Model) loadTransactions() map[string]internal.Transaction {
 	tempTransactions := m.db.Data.Transactions
 	log.Printf("Found %d transactions\n", len(tempTransactions))
-	transactionModels := make([]models.TransactionModel, len(tempTransactions))
-	for i, transaction := range tempTransactions {
-		transactionModels[i] = models.NewTransactionModel(transaction)
-	}
-	return transactionModels
+	return tempTransactions
 }
 
-func transformTransactionModelsToTableRows(transactionModels []models.TransactionModel) []table.Row {
-	rows := make([]table.Row, len(transactionModels))
-	for i, t := range transactionModels {
+func transformTransactionsToTableRows(transactions map[string]internal.Transaction) []table.Row {
+	rows := make([]table.Row, len(transactions))
+
+	var index int
+	for _, t := range transactions {
 		var style lipgloss.Style
-		if t.Transaction.Direction == internal.MoneyOutflow {
+		var value string
+		if t.Direction == internal.MoneyOutflow {
+			value = fmt.Sprintf("-%.2f", t.Value)
 			style = lipgloss.NewStyle().Foreground(lipgloss.Color("#d11141"))
 		} else {
+			value = fmt.Sprintf("%.2f", t.Value)
 			style = lipgloss.NewStyle().Foreground(lipgloss.Color("#00b159"))
 		}
 
-		rows[i] = table.NewRow(table.RowData{
-			columnKeyValue:       style.Render(fmt.Sprintf("%.2f", t.Transaction.Value)),
-			columnKeyTime:        t.Transaction.Time.Format("02-01-2006"),
-			columnKeyPayee:       t.Transaction.Payee,
-			columnKeyAccount:     t.Transaction.Account,
-			columnKeyBudget:      t.Transaction.Budget,
-			columnKeyDescription: t.Transaction.Description,
-			columnKeyID:          t.Transaction.ID.String(),
+		rows[index] = table.NewRow(table.RowData{
+			columnKeyValue:       style.Render(value),
+			columnKeyTime:        t.Time.Format("02-01-2006"),
+			columnKeyPayee:       t.Payee,
+			columnKeyAccount:     t.Account,
+			columnKeyCategory:    t.Category,
+			columnKeyDescription: t.Description,
+			columnKeyID:          t.Id.String(),
 		})
+		index++
 	}
 	return rows
 }
@@ -133,14 +138,14 @@ func createTableColumns() []table.Column {
 		table.NewColumn(columnKeyTime, "Time", 10),
 		table.NewFlexColumn(columnKeyPayee, "Payee", 15),
 		table.NewFlexColumn(columnKeyAccount, "Account", 15),
-		table.NewFlexColumn(columnKeyBudget, "Budget", 15),
+		table.NewFlexColumn(columnKeyCategory, "Category", 15),
 		table.NewFlexColumn(columnKeyDescription, "Description", 15),
 	}
 }
 
 func NewOverviewModel(db *internal.JSONDatabase) Model {
 	m := Model{db: db}
-	tableRows := transformTransactionModelsToTableRows(m.loadTransactions())
+	tableRows := transformTransactionsToTableRows(m.loadTransactions())
 	tableColumns := createTableColumns()
 
 	keys := table.DefaultKeyMap()
@@ -161,7 +166,8 @@ func NewOverviewModel(db *internal.JSONDatabase) Model {
 				Align(lipgloss.Left),
 		).
 		SortByAsc(columnKeyTime).
-		WithStaticFooter(getFooter())
+		WithStaticFooter(getFooter()).
+		Border(constants.CustomBorder)
 	m.table = transactionTable
 
 	return m
